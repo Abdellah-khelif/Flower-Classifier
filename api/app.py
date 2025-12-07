@@ -5,68 +5,60 @@ from keras.models import load_model
 from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow.keras.preprocessing import image
 import numpy as np
-import tensorflow_datasets as tfds
-from io import BytesIO  # To handle image bytes
+from io import BytesIO
 
-# -------------------- Load class names --------------------
-# Load Oxford Flowers 102 dataset metadata to get class names
-# We only load 1% of the train split, just to get the info (not actual images)
-_, ds_info = tfds.load(
-    'oxford_flowers102',
-    split=['train[:1%]'],
-    with_info=True,
-    as_supervised=True
-)
-# Get the list of flower class names (0-101)
-class_names = ds_info.features['label'].names
+# -------------------- Class Names (Oxford Flowers 102) --------------------
+class_names = [
+    "pink primrose", "hard-leaved pocket orchid", "canterbury bells", "sweet pea", "english marigold",
+    "tiger lily", "moon orchid", "bird of paradise", "monkshood", "globe thistle", "snapdragon",
+    "colt's foot", "king protea", "spear thistle", "yellow iris", "globe-flower", "purple coneflower",
+    "peruvian lily", "balloon flower", "giant white arum lily", "fire lily", "pincushion flower",
+    "fritillary", "red ginger", "grape hyacinth", "corn poppy", "prince of wales feathers",
+    "stemless gentian", "artichoke", "sweet william", "carnation", "garden phlox", "love in the mist",
+    "mexican aster", "alpine sea holly", "ruby-lipped cattleya", "cape flower", "great masterwort",
+    "siam tulip", "lenten rose", "barberton daisy", "daffodil", "sword lily", "poinsettia",
+    "bolero deep blue", "wallflower", "marigold", "buttercup", "oxeye daisy", "common dandelion",
+    "petunia", "wild pansy", "primula", "sunflower", "pelargonium", "bishop of llandaff", "gaura",
+    "geranium", "orange dahlia", "pink-yellow dahlia?", "cautleya spicata", "japanese anemone",
+    "black-eyed susan", "silverbush", "californian poppy", "osteospermum", "spring crocus",
+    "bearded iris", "windflower", "tree poppy", "gazania", "azalea", "water lily", "rose", "thorn apple",
+    "morning glory", "passion flower", "lotus", "toad lily", "anthurium", "frangipani", "clematis",
+    "hibiscus", "columbine", "desert-rose", "tree mallow", "magnolia", "cyclamen", "watercress",
+    "canna lily", "hippeastrum", "bee balm", "ball moss", "foxglove", "bougainvillea", "camellia",
+    "mallow", "mexican petunia", "bromelia", "blanket flower", "trumpet creeper", "blackberry lily"
+]
 
-# -------------------- Load trained model --------------------
+# -------------------- Load Model --------------------
 MODEL_PATH = "flower_model.h5"
-model = load_model(MODEL_PATH)  # Load the trained Keras model
+model = load_model(MODEL_PATH)
 
 IMG_SIZE = 224  # Model input size
 
-# -------------------- FastAPI setup --------------------
-app = FastAPI()  # Create FastAPI app instance
+# -------------------- FastAPI Setup --------------------
+app = FastAPI()
 
-# Enable CORS (Cross-Origin Resource Sharing) so frontend can call API from any origin
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow requests from any domain
-    allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  # Allow all headers
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# -------------------- Helper function --------------------
+# -------------------- Image Preprocess Function --------------------
 def prepare_image(bytes_data):
-    """
-    Convert uploaded image bytes into model-ready input:
-    1. Load image from bytes
-    2. Resize to model input size
-    3. Convert to array
-    4. Expand dims to make batch size = 1
-    5. Preprocess for ResNet50
-    """
     img = image.load_img(BytesIO(bytes_data), target_size=(IMG_SIZE, IMG_SIZE))
     img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
-    return preprocess_input(img_array)  # Normalize input like ResNet expects
+    img_array = np.expand_dims(img_array, axis=0)
+    return preprocess_input(img_array)
 
-# -------------------- API endpoint --------------------
+# -------------------- Prediction Endpoint --------------------
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    """
-    Endpoint to predict flower type from uploaded image
-    - Receives an image file
-    - Converts it to model input
-    - Runs prediction
-    - Returns the predicted flower class
-    """
-    content = await file.read()  # Read uploaded file as bytes
+    content = await file.read()
 
-    img = prepare_image(content)       # Preprocess image
-    preds = model.predict(img)         # Get predictions
-    idx = np.argmax(preds, axis=1)[0] # Get index of highest probability
-    flower = class_names[idx]          # Map index to class name
+    img = prepare_image(content)
+    preds = model.predict(img)
+    idx = np.argmax(preds, axis=1)[0]
+    flower = class_names[idx]
 
-    return {"prediction": flower}      # Return JSON response
+    return {"prediction": flower}
