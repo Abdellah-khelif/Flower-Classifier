@@ -8,12 +8,12 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications.resnet50 import preprocess_input
 
-# -------------------- Suppress TF warnings (optional) --------------------
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Only show warnings and errors
+# -------------------- Suppress TF verbose logs --------------------
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Only errors
 
 # -------------------- Model & Class Names --------------------
 MODEL_PATH = "flower_model.h5"
-IMG_SIZE = 224  # Model input size
+IMG_SIZE = 224
 
 class_names = [
     "pink primrose", "hard-leaved pocket orchid", "canterbury bells", "sweet pea", "english marigold",
@@ -35,8 +35,10 @@ class_names = [
     "mallow", "mexican petunia", "bromelia", "blanket flower", "trumpet creeper", "blackberry lily"
 ]
 
-# Load the trained model
+# -------------------- Load Model --------------------
+print("Loading model...")
 model = load_model(MODEL_PATH)
+print("Model loaded successfully!")
 
 # -------------------- FastAPI Setup --------------------
 app = FastAPI(title="Flower Classifier API")
@@ -47,6 +49,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# -------------------- Health Check Endpoint --------------------
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 # -------------------- Image Preprocessing --------------------
 def prepare_image(bytes_data):
@@ -61,12 +68,13 @@ async def predict(file: UploadFile = File(...)):
     content = await file.read()
     img = prepare_image(content)
     preds = model.predict(img)
-    idx = np.argmax(preds, axis=1)[0]
+    idx = int(np.argmax(preds, axis=1)[0])
     flower = class_names[idx]
     return {"prediction": flower}
 
-# -------------------- Run the App (for Render) --------------------
+# -------------------- Run the App --------------------
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))  # Render dynamically sets PORT
+    port = int(os.environ.get("PORT", 8000))
+    print(f"Starting app on port {port}...")
     uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
