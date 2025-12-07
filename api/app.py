@@ -1,13 +1,20 @@
+# app.py
+import os
+from io import BytesIO
+import numpy as np
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-import tensorflow as tf
-from keras.models import load_model
-from tensorflow.keras.applications.resnet50 import preprocess_input
+from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
-import numpy as np
-from io import BytesIO
+from tensorflow.keras.applications.resnet50 import preprocess_input
 
-# -------------------- Class Names (Oxford Flowers 102) --------------------
+# -------------------- Suppress TF warnings (optional) --------------------
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Only show warnings and errors
+
+# -------------------- Model & Class Names --------------------
+MODEL_PATH = "flower_model.h5"
+IMG_SIZE = 224  # Model input size
+
 class_names = [
     "pink primrose", "hard-leaved pocket orchid", "canterbury bells", "sweet pea", "english marigold",
     "tiger lily", "moon orchid", "bird of paradise", "monkshood", "globe thistle", "snapdragon",
@@ -28,14 +35,11 @@ class_names = [
     "mallow", "mexican petunia", "bromelia", "blanket flower", "trumpet creeper", "blackberry lily"
 ]
 
-# -------------------- Load Model --------------------
-MODEL_PATH = "flower_model.h5"
+# Load the trained model
 model = load_model(MODEL_PATH)
 
-IMG_SIZE = 224  # Model input size
-
 # -------------------- FastAPI Setup --------------------
-app = FastAPI()
+app = FastAPI(title="Flower Classifier API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,7 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -------------------- Image Preprocess Function --------------------
+# -------------------- Image Preprocessing --------------------
 def prepare_image(bytes_data):
     img = image.load_img(BytesIO(bytes_data), target_size=(IMG_SIZE, IMG_SIZE))
     img_array = image.img_to_array(img)
@@ -55,10 +59,14 @@ def prepare_image(bytes_data):
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     content = await file.read()
-
     img = prepare_image(content)
     preds = model.predict(img)
     idx = np.argmax(preds, axis=1)[0]
     flower = class_names[idx]
-
     return {"prediction": flower}
+
+# -------------------- Run the App (for Render) --------------------
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))  # Render dynamically sets PORT
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
