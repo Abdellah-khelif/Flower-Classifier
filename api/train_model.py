@@ -5,7 +5,6 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 import tensorflow_datasets as tfds
-import numpy as np
 import os
 
 # ---------------- Configuration ----------------
